@@ -21,7 +21,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(
     index.onDidChange(() => {
       if (tabLabels.enabled) {
-        void tabLabels.sync();
+        void tabLabels.syncIfEnabled();
       }
     }),
   );
@@ -102,7 +102,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   void index.refresh().then(() => {
     if (tabLabels.enabled) {
-      return tabLabels.sync();
+      return tabLabels.syncIfEnabled();
     }
     return undefined;
   }).catch((error: unknown) => {

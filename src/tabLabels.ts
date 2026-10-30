@@ -115,35 +115,56 @@ export class TabLabelManager {
       return false;
     }
 
-    const succeeded = await this.sync(true);
-    if (!succeeded) {
-      void vscode.window.showWarningMessage(
-        "GritPad could not clean up editor tab titles. See the GritPad output for details.",
+    return this.enqueueSync(async () => {
+      try {
+        await this.workspaceState.update(enabledStateKey, false);
+      } catch (error) {
+        this.output.appendLine(`Unable to persist the tab-label opt-out: ${String(error)}`);
+        void vscode.window.showWarningMessage(
+          "GritPad could not save the tab-label opt-out. Tab titles remain enabled.",
+        );
+        return false;
+      }
+
+      let succeeded = false;
+      try {
+        succeeded = await this.syncOnce(true);
+      } catch (error) {
+        this.output.appendLine(`Unable to synchronize workspace tab-label settings: ${String(error)}`);
+      }
+      if (!succeeded) {
+        try {
+          await this.workspaceState.update(enabledStateKey, true);
+        } catch (error) {
+          this.output.appendLine(`Unable to restore the tab-label opt-in: ${String(error)}`);
+        }
+        void vscode.window.showWarningMessage(
+          "GritPad could not clean up editor tab titles. See the GritPad output for details.",
+        );
+        return false;
+      }
+      void vscode.window.showInformationMessage(
+        "Markdown editor tab titles are disabled for this workspace.",
       );
-      return false;
-    }
-    try {
-      await this.workspaceState.update(enabledStateKey, false);
-    } catch (error) {
-      this.output.appendLine(`Unable to persist the tab-title opt-out: ${String(error)}`);
-      void vscode.window.showWarningMessage(
-        "GritPad removed its workspace rules but could not save the opt-out. Tab titles may be re-added after reload.",
-      );
-      return false;
-    }
-    void vscode.window.showInformationMessage(
-      "Markdown editor tab titles are disabled for this workspace.",
-    );
-    return true;
+      return true;
+    });
   }
 
   async sync(removeAllOwned = false): Promise<boolean> {
-    const task = this.syncQueue.then(() => this.syncOnce(removeAllOwned)).catch((error: unknown) => {
+    return this.enqueueSync(() => this.syncOnce(removeAllOwned));
+  }
+
+  async syncIfEnabled(): Promise<boolean> {
+    return this.enqueueSync(() => this.enabled ? this.syncOnce(false) : Promise.resolve(true));
+  }
+
+  private enqueueSync(task: () => Promise<boolean>): Promise<boolean> {
+    const queuedTask = this.syncQueue.then(task).catch((error: unknown) => {
       this.output.appendLine(`Unable to synchronize workspace tab-label settings: ${String(error)}`);
       return false;
     });
-    this.syncQueue = task.then(() => undefined);
-    return task;
+    this.syncQueue = queuedTask.then(() => undefined);
+    return queuedTask;
   }
 
   private async syncOnce(removeAllOwned: boolean): Promise<boolean> {

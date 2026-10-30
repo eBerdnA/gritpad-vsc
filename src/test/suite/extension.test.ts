@@ -238,6 +238,45 @@ suite("GritPad Extension Host", () => {
     );
   });
 
+  test("does not re-add tab labels from an automatic sync queued during disable", async () => {
+    const configuration = vscode.workspace.getConfiguration("workbench.editor.customLabels");
+    const originalWorkspacePatterns = configuration.inspect<Record<string, string>>("patterns")
+      ?.workspaceValue;
+    const articleUri = vscode.Uri.joinPath(workspaceFolder.uri, "docs", "article.md");
+    const articlePattern = exactPattern(workspaceFolder.uri.path, articleUri.path);
+    const patterns = { ...(originalWorkspacePatterns ?? {}), [articlePattern]: "Owned label" };
+    await configuration.update("patterns", patterns, vscode.ConfigurationTarget.Workspace);
+
+    const state = new BlockingOwnedRulesMemento();
+    await state.update("gritPad.tabLabelsEnabled", true);
+    await state.update("gritPad.ownedTabRules", { [articlePattern]: "Owned label" });
+    const manager = new TabLabelManager(state, index, output);
+    try {
+      const disabling = manager.disable();
+      await state.ownedRulesUpdateStarted;
+      const queuedSync = manager.syncIfEnabled();
+      state.resumeOwnedRulesUpdate();
+
+      assert.equal(await disabling, true);
+      assert.equal(await queuedSync, true);
+      assert.equal(state.get("gritPad.tabLabelsEnabled"), false);
+      assert.equal(
+        Object.hasOwn(
+          configuration.inspect<Record<string, string>>("patterns")?.workspaceValue ?? {},
+          articlePattern,
+        ),
+        false,
+      );
+    } finally {
+      state.resumeOwnedRulesUpdate();
+      await configuration.update(
+        "patterns",
+        originalWorkspacePatterns,
+        vscode.ConfigurationTarget.Workspace,
+      );
+    }
+  });
+
   test("includes both workspace roots in the tree and index", async () => {
     await index.refresh(true);
 
@@ -343,6 +382,31 @@ class TestMemento implements vscode.Memento {
     } else {
       this.values.set(key, value);
     }
+  }
+}
+
+class BlockingOwnedRulesMemento extends TestMemento {
+  private unblock!: () => void;
+  private markStarted!: () => void;
+  private blocked = false;
+  readonly ownedRulesUpdateStarted = new Promise<void>((resolve) => {
+    this.markStarted = resolve;
+  });
+  private readonly ownedRulesUpdateGate = new Promise<void>((resolve) => {
+    this.unblock = resolve;
+  });
+
+  override async update(key: string, value: unknown): Promise<void> {
+    if (key === "gritPad.ownedTabRules" && !this.blocked) {
+      this.blocked = true;
+      this.markStarted();
+      await this.ownedRulesUpdateGate;
+    }
+    await super.update(key, value);
+  }
+
+  resumeOwnedRulesUpdate(): void {
+    this.unblock();
   }
 }
 
