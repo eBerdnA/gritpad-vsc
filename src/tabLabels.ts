@@ -153,7 +153,7 @@ export class TabLabelManager {
     }
 
     const configuration = vscode.workspace.getConfiguration("workbench.editor.customLabels");
-    if (!configuration.get<boolean>("enabled", true)) {
+    if (!removeAllOwned && !configuration.get<boolean>("enabled", true)) {
       this.output.appendLine(
         "Tab labels were not updated because workbench.editor.customLabels.enabled is false.",
       );
