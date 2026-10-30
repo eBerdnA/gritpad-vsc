@@ -173,12 +173,72 @@ export class TabLabelManager {
       return false;
     }
 
+    const previousOwned = { ...this.workspaceState.get<OwnedRules>(ownedRulesStateKey, {}) };
+    for (let attempt = 1; attempt <= maxSyncAttempts; attempt += 1) {
+      const plan = this.planSync(removeAllOwned, previousOwned);
+      if (!plan) {
+        return false;
+      }
+
+      try {
+        await this.workspaceState.update(ownedRulesStateKey, plan.owned);
+      } catch (error) {
+        this.output.appendLine(`Unable to save owned tab-label rules: ${String(error)}`);
+        void vscode.window.showWarningMessage(
+          "GritPad could not save ownership for its tab-label rules. See the GritPad output for details.",
+        );
+        return false;
+      }
+
+      // Settings may have changed while ownership was being persisted. Writing the planned
+      // object now would revert those edits, so plan again from the current settings.
+      const configuration = vscode.workspace.getConfiguration("workbench.editor.customLabels");
+      if (settingsSnapshot(configuration) !== plan.snapshot) {
+        this.output.appendLine(
+          "Tab-label settings changed during synchronization; recalculating rules.",
+        );
+        continue;
+      }
+      if (!plan.patternsChanged) {
+        return true;
+      }
+
+      try {
+        await configuration.update(
+          "patterns",
+          Object.keys(plan.nextPatterns).length > 0 ? plan.nextPatterns : undefined,
+          vscode.ConfigurationTarget.Workspace,
+        );
+        return true;
+      } catch (error) {
+        this.output.appendLine(`Unable to update workspace tab-label settings: ${String(error)}`);
+        await this.restoreOwnership(previousOwned);
+        return false;
+      }
+    }
+
+    this.output.appendLine(
+      "Tab-label settings kept changing during synchronization; no settings were written.",
+    );
+    await this.restoreOwnership(previousOwned);
+    return false;
+  }
+
+  private async restoreOwnership(previousOwned: OwnedRules): Promise<void> {
+    try {
+      await this.workspaceState.update(ownedRulesStateKey, previousOwned);
+    } catch (error) {
+      this.output.appendLine(`Unable to restore tab-label ownership: ${String(error)}`);
+    }
+  }
+
+  private planSync(removeAllOwned: boolean, previousOwned: OwnedRules): SyncPlan | undefined {
     const configuration = vscode.workspace.getConfiguration("workbench.editor.customLabels");
     if (!removeAllOwned && !configuration.get<boolean>("enabled", true)) {
       this.output.appendLine(
         "Tab labels were not updated because workbench.editor.customLabels.enabled is false.",
       );
-      return false;
+      return undefined;
     }
 
     const patterns = configuration.get<unknown>("patterns", {});
@@ -195,12 +255,11 @@ export class TabLabelManager {
       this.output.appendLine(
         "Tab labels were not updated because workbench.editor.customLabels.patterns is not an object.",
       );
-      return false;
+      return undefined;
     }
 
     const effectivePatterns = patterns as Record<string, unknown>;
     const currentWorkspacePatterns = (workspacePatternsValue ?? {}) as Record<string, unknown>;
-    const previousOwned = { ...this.workspaceState.get<OwnedRules>(ownedRulesStateKey, {}) };
     const owned = { ...previousOwned };
     const candidates = this.index.getEntries().map((entry) => {
       const workspaceFolder = vscode.workspace.getWorkspaceFolder(entry.uri);
@@ -281,38 +340,30 @@ export class TabLabelManager {
       }
     }
 
-    const patternsChanged = !sameRecord(currentWorkspacePatterns, nextPatterns);
-    try {
-      await this.workspaceState.update(ownedRulesStateKey, owned);
-    } catch (error) {
-      this.output.appendLine(`Unable to save owned tab-label rules: ${String(error)}`);
-      void vscode.window.showWarningMessage(
-        "GritPad could not save ownership for its tab-label rules. See the GritPad output for details.",
-      );
-      return false;
-    }
-
-    if (patternsChanged) {
-      try {
-        await configuration.update(
-          "patterns",
-          Object.keys(nextPatterns).length > 0 ? nextPatterns : undefined,
-          vscode.ConfigurationTarget.Workspace,
-        );
-      } catch (error) {
-        this.output.appendLine(`Unable to update workspace tab-label settings: ${String(error)}`);
-        try {
-          await this.workspaceState.update(ownedRulesStateKey, previousOwned);
-        } catch (restoreError) {
-          this.output.appendLine(
-            `Unable to restore tab-label ownership after settings update failed: ${String(restoreError)}`,
-          );
-        }
-        return false;
-      }
-    }
-    return true;
+    return {
+      snapshot: settingsSnapshot(configuration),
+      owned,
+      nextPatterns,
+      patternsChanged: !sameRecord(currentWorkspacePatterns, nextPatterns),
+    };
   }
+}
+
+interface SyncPlan {
+  snapshot: string;
+  owned: OwnedRules;
+  nextPatterns: Record<string, unknown>;
+  patternsChanged: boolean;
+}
+
+const maxSyncAttempts = 3;
+
+function settingsSnapshot(configuration: vscode.WorkspaceConfiguration): string {
+  return JSON.stringify([
+    configuration.get<unknown>("enabled", true),
+    configuration.get<unknown>("patterns", {}),
+    configuration.inspect<unknown>("patterns")?.workspaceValue ?? null,
+  ]);
 }
 
 function sameRecord(

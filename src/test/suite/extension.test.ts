@@ -277,6 +277,49 @@ suite("GritPad Extension Host", () => {
     }
   });
 
+  test("keeps concurrent tab-label setting edits made while ownership is being saved", async () => {
+    const configuration = () => vscode.workspace.getConfiguration("workbench.editor.customLabels");
+    const originalWorkspacePatterns = configuration().inspect<Record<string, string>>("patterns")
+      ?.workspaceValue;
+    const articleUri = vscode.Uri.joinPath(workspaceFolder.uri, "docs", "article.md");
+    const articlePattern = exactPattern(workspaceFolder.uri.path, articleUri.path);
+    await configuration().update(
+      "patterns",
+      { ...(originalWorkspacePatterns ?? {}), [articlePattern]: "Owned label" },
+      vscode.ConfigurationTarget.Workspace,
+    );
+
+    const state = new BlockingOwnedRulesMemento();
+    await TestMemento.prototype.update.call(state, "gritPad.ownedTabRules", { [articlePattern]: "Owned label" });
+    const manager = new TabLabelManager(state, index, output);
+    try {
+      const syncing = manager.sync();
+      await state.ownedRulesUpdateStarted;
+      const concurrentPatterns = {
+        ...configuration().inspect<Record<string, string>>("patterns")?.workspaceValue,
+        "concurrent.md": "Concurrent label",
+        [articlePattern]: "User-edited label",
+      };
+      await configuration().update("patterns", concurrentPatterns, vscode.ConfigurationTarget.Workspace);
+      state.resumeOwnedRulesUpdate();
+
+      assert.equal(await syncing, true);
+      const patterns = configuration().inspect<Record<string, string>>("patterns")?.workspaceValue;
+      assert.equal(patterns?.["concurrent.md"], "Concurrent label");
+      assert.equal(patterns?.[articlePattern], "User-edited label");
+      const owned = state.get<Record<string, string>>("gritPad.ownedTabRules", {});
+      assert.equal(Object.hasOwn(owned, articlePattern), false);
+      assert.equal(Object.hasOwn(owned, "concurrent.md"), false);
+    } finally {
+      state.resumeOwnedRulesUpdate();
+      await configuration().update(
+        "patterns",
+        originalWorkspacePatterns,
+        vscode.ConfigurationTarget.Workspace,
+      );
+    }
+  });
+
   test("includes both workspace roots in the tree and index", async () => {
     await index.refresh(true);
 
