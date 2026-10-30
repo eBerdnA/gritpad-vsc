@@ -24,6 +24,12 @@ Tab-label rules are written only in trusted workspaces. VS Code's custom-label s
 
 Unicode titles are supported when they include an ASCII letter or digit. The custom-label feature must also remain enabled in VS Code settings.
 
+## Create a note
+
+Run **Markdown Titles: New Note** from the Command Palette. Enter a title and choose the destination folder; the folder picker defaults to the current workspace note's folder, or the first workspace root. Cancel either prompt to leave files unchanged.
+
+The command creates and saves `<new UUID>.md`, then opens it in a normal editor. Its leading YAML frontmatter contains the matching UUID `id`, your title, and identical `created` and `modified` timestamps in the computer's local time and UTC offset. Titles are safely YAML-escaped when needed. Existing files are never overwritten. Note creation requires a trusted workspace; it does not enable timestamp-on-save or change your notes allowlist.
+
 ## Update note modification timestamps on save (opt-in)
 
 In **Workspace** or **Workspace Folder** settings, explicitly enable the feature and select your notes with folder-relative glob patterns:
@@ -53,7 +59,7 @@ npm run package
 Install the generated VSIX with VS Code:
 
 ```sh
-code --install-extension markdown-frontmatter-titles-0.2.0.vsix
+code --install-extension markdown-frontmatter-titles-0.3.0.vsix
 ```
 
 ## Development and tests

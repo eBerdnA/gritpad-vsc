@@ -5,6 +5,8 @@ import * as vscode from "vscode";
 import { TitleIndex } from "../../titleIndex";
 import { TabLabelManager } from "../../tabLabels";
 import { TitleTree } from "../../titleTree";
+import { createNoteFile } from "../../newNoteCommand";
+import { parse } from "yaml";
 
 suite("Markdown Frontmatter Titles Extension Host", () => {
   const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -263,6 +265,28 @@ suite("Markdown Frontmatter Titles Extension Host", () => {
       for (const uri of files) {
         await vscode.workspace.fs.delete(uri);
       }
+    }
+  });
+
+  test("creates a UUID-named file with matching frontmatter and normal editor access", async () => {
+    const commands = await vscode.commands.getCommands();
+    assert.ok(commands.includes("frontmatterTitles.newNote"));
+    const uri = await createNoteFile(workspaceFolder.uri, "A title: with YAML punctuation");
+    try {
+      const contents = Buffer.from(await vscode.workspace.fs.readFile(uri)).toString("utf8");
+      const data = parse(contents.slice(4, contents.lastIndexOf("---")));
+      assert.match(data.id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+      assert.equal(path.basename(uri.fsPath), `${data.id}.md`);
+      assert.equal(data.title, "A title: with YAML punctuation");
+      assert.equal(data.created, data.modified);
+      assert.match(data.created, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [+-]\d{4}$/);
+      const document = await vscode.workspace.openTextDocument(uri);
+      await vscode.window.showTextDocument(document);
+      assert.equal(vscode.window.activeTextEditor?.document.uri.toString(), uri.toString());
+      assert.equal(document.isDirty, false);
+      assert.equal(document.getText(), contents);
+    } finally {
+      await vscode.workspace.fs.delete(uri);
     }
   });
 

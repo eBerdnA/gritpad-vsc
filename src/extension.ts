@@ -4,6 +4,8 @@ import { TabLabelManager } from "./tabLabels";
 import { TitleTree } from "./titleTree";
 import { registerModifiedOnSave } from "./modifiedOnSave";
 
+import { newNoteCommand } from "./newNoteCommand";
+
 export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel("Markdown Titles");
   const index = new TitleIndex(output);
@@ -23,6 +25,13 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
   context.subscriptions.push(
+    vscode.commands.registerCommand("frontmatterTitles.newNote", async () => {
+      const uri = await newNoteCommand(output);
+      if (uri) {
+        index.invalidate(uri);
+        await index.refresh();
+      }
+    }),
     vscode.commands.registerCommand("frontmatterTitles.refresh", async () => {
       await index.refresh(true);
     }),

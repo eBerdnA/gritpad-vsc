@@ -2,7 +2,7 @@
   "name": "markdown-frontmatter-titles",
   "displayName": "Markdown Frontmatter Titles",
   "description": "Show YAML frontmatter titles in an Explorer view and optionally in editor tabs.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "local",
   "license": "MIT",
   "engines": {
@@ -33,6 +33,10 @@
       {
         "command": "frontmatterTitles.disableTabLabels",
         "title": "Markdown Titles: Disable Editor Tab Titles"
+      },
+      {
+        "command": "frontmatterTitles.newNote",
+        "title": "Markdown Titles: New Note"
       }
     ],
     "views": {
@@ -46,7 +50,7 @@
     "viewsWelcome": [
       {
         "view": "frontmatterTitles",
-        "contents": "Shows Markdown files using their YAML frontmatter `title` when available. [Refresh](command:frontmatterTitles.refresh) \u00b7 [Enable tab titles](command:frontmatterTitles.enableTabLabels)"
+        "contents": "Shows Markdown files using their YAML frontmatter `title` when available. [Refresh](command:frontmatterTitles.refresh) · [Enable tab titles](command:frontmatterTitles.enableTabLabels)"
       }
     ],
     "menus": {
