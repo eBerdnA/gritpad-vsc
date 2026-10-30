@@ -31,41 +31,15 @@ export function createTabLabelRules(
 ): TabLabelRuleSet {
   const candidates = new Map<
     string,
-    Array<{ entry: TabLabelCandidate; pattern: string; title: string }>
+    Array<{ entry: TabLabelCandidate; pattern: string; title?: string }>
   >();
   const skipped: SkippedTabLabel[] = [];
 
   for (const entry of entries) {
-    const title = entry.title;
-    if (!title) {
-      continue;
-    }
     if (!entry.workspaceFolderPath) {
       skipped.push({ path: entry.path, reason: "The file is outside the current workspace." });
       continue;
     }
-    if (!supportedTitleCharacters.test(title)) {
-      skipped.push({
-        path: entry.path,
-        reason: "VS Code requires an ASCII letter or digit in a custom tab label.",
-      });
-      continue;
-    }
-    if (templateExpression.test(title)) {
-      skipped.push({
-        path: entry.path,
-        reason: "The title contains syntax that VS Code interprets as a label template.",
-      });
-      continue;
-    }
-    if (/[\u0000-\u001f\u007f]/.test(title)) {
-      skipped.push({
-        path: entry.path,
-        reason: "The title contains control characters that are unsafe for a tab label.",
-      });
-      continue;
-    }
-
     const pattern = path.posix.relative(
       path.posix.dirname(entry.workspaceFolderPath),
       entry.uriPath,
@@ -85,15 +59,48 @@ export function createTabLabelRules(
 
     const collisionKey = pattern.toLowerCase();
     const samePattern = candidates.get(collisionKey) ?? [];
-    samePattern.push({ entry, pattern, title });
+    samePattern.push({ entry, pattern, title: entry.title });
     candidates.set(collisionKey, samePattern);
   }
 
   const rules = new Map<string, string>();
   for (const samePattern of candidates.values()) {
-    const titles = new Set(samePattern.map((candidate) => candidate.title));
+    const eligible: Array<{ entry: TabLabelCandidate; pattern: string; title: string }> = [];
+    for (const candidate of samePattern) {
+      const { title } = candidate;
+      if (!title) {
+        continue;
+      }
+      let reason: string | undefined;
+      if (!supportedTitleCharacters.test(title)) {
+        reason = "VS Code requires an ASCII letter or digit in a custom tab label.";
+      } else if (templateExpression.test(title)) {
+        reason = "The title contains syntax that VS Code interprets as a label template.";
+      } else if (/[\u0000-\u001f\u007f]/.test(title)) {
+        reason = "The title contains control characters that are unsafe for a tab label.";
+      }
+      if (reason) {
+        skipped.push({ path: candidate.entry.path, reason });
+      } else {
+        eligible.push({ ...candidate, title });
+      }
+    }
+
+    if (eligible.length !== samePattern.length) {
+      if (eligible.length > 0) {
+        for (const candidate of eligible) {
+          skipped.push({
+            path: candidate.entry.path,
+            reason: "Another workspace file has the same case-insensitive exact pattern but cannot be safely labeled.",
+          });
+        }
+      }
+      continue;
+    }
+
+    const titles = new Set(eligible.map((candidate) => candidate.title));
     if (titles.size > 1) {
-      for (const candidate of samePattern) {
+      for (const candidate of eligible) {
         skipped.push({
           path: candidate.entry.path,
           reason: "Another workspace file has the same case-insensitive exact pattern but a different title.",
@@ -101,7 +108,7 @@ export function createTabLabelRules(
       }
       continue;
     }
-    rules.set(samePattern[0].pattern, samePattern[0].title);
+    rules.set(eligible[0].pattern, eligible[0].title);
   }
 
   return { rules, skipped };

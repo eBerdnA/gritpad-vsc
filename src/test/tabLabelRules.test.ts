@@ -84,6 +84,43 @@ test("does not create rules for Markdown files without a frontmatter title", () 
   assert.equal(result.rules.size, 0);
 });
 
+test("does not create a rule when another matching Markdown file has no frontmatter title", () => {
+  const result = createTabLabelRules([
+    {
+      path: "/a/notes/page.md",
+      uriPath: "/a/notes/page.md",
+      workspaceFolderPath: "/a/notes",
+      title: "Page",
+    },
+    {
+      path: "/b/notes/page.md",
+      uriPath: "/b/notes/page.md",
+      workspaceFolderPath: "/b/notes",
+    },
+  ]);
+  assert.equal(result.rules.size, 0);
+});
+
+test("does not create a rule when another matching Markdown file has an unsupported title", () => {
+  const result = createTabLabelRules([
+    {
+      path: "/a/notes/page.md",
+      uriPath: "/a/notes/page.md",
+      workspaceFolderPath: "/a/notes",
+      title: "Page",
+    },
+    {
+      path: "/b/notes/page.md",
+      uriPath: "/b/notes/page.md",
+      workspaceFolderPath: "/b/notes",
+      title: "📚",
+    },
+  ]);
+  assert.equal(result.rules.size, 0);
+  assert.match(result.skipped[0].reason, /ASCII letter or digit/);
+  assert.match(result.skipped[1].reason, /cannot be safely labeled/);
+});
+
 test("rejects glob metacharacters in file paths", () => {
   const result = createTabLabelRules([
     {

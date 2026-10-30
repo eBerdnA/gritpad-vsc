@@ -202,16 +202,14 @@ export class TabLabelManager {
     const currentWorkspacePatterns = (workspacePatternsValue ?? {}) as Record<string, unknown>;
     const previousOwned = { ...this.workspaceState.get<OwnedRules>(ownedRulesStateKey, {}) };
     const owned = { ...previousOwned };
-    const candidates = this.index.getEntries().flatMap((entry) => {
+    const candidates = this.index.getEntries().map((entry) => {
       const workspaceFolder = vscode.workspace.getWorkspaceFolder(entry.uri);
-      return entry.frontmatterTitle
-        ? [{
-            path: entry.uri.fsPath,
-            uriPath: entry.uri.path,
-            workspaceFolderPath: workspaceFolder?.uri.path,
-            title: entry.frontmatterTitle,
-          }]
-        : [];
+      return {
+        path: entry.uri.fsPath,
+        uriPath: entry.uri.path,
+        workspaceFolderPath: workspaceFolder?.uri.path,
+        title: entry.frontmatterTitle,
+      };
     });
     const ruleSet = removeAllOwned ? undefined : createTabLabelRules(candidates);
     const desired = ruleSet?.rules ?? new Map<string, string>();
