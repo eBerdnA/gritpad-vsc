@@ -320,6 +320,29 @@ suite("GritPad Extension Host", () => {
     }
   });
 
+  test("does not opt in when cleanup fails for a workspace that never enabled tab labels", async () => {
+    const configuration = () => vscode.workspace.getConfiguration("workbench.editor.customLabels");
+    const originalWorkspacePatterns = configuration().inspect<unknown>("patterns")?.workspaceValue;
+    const state = new TestMemento();
+    const manager = new TabLabelManager(state, index, output);
+    try {
+      await configuration().update("patterns", ["invalid"], vscode.ConfigurationTarget.Workspace);
+      assert.equal(await manager.disable(), false);
+      assert.equal(manager.enabled, false);
+      assert.equal(state.get("gritPad.tabLabelsEnabled"), false);
+
+      await state.update("gritPad.tabLabelsEnabled", true);
+      assert.equal(await manager.disable(), false);
+      assert.equal(manager.enabled, true);
+    } finally {
+      await configuration().update(
+        "patterns",
+        originalWorkspacePatterns,
+        vscode.ConfigurationTarget.Workspace,
+      );
+    }
+  });
+
   test("includes both workspace roots in the tree and index", async () => {
     await index.refresh(true);
 

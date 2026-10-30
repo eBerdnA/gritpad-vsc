@@ -116,12 +116,13 @@ export class TabLabelManager {
     }
 
     return this.enqueueSync(async () => {
+      const wasEnabled = this.enabled;
       try {
         await this.workspaceState.update(enabledStateKey, false);
       } catch (error) {
         this.output.appendLine(`Unable to persist the tab-label opt-out: ${String(error)}`);
         void vscode.window.showWarningMessage(
-          "GritPad could not save the tab-label opt-out. Tab titles remain enabled.",
+          "GritPad could not save the tab-label opt-out. The tab-title setting is unchanged.",
         );
         return false;
       }
@@ -134,9 +135,9 @@ export class TabLabelManager {
       }
       if (!succeeded) {
         try {
-          await this.workspaceState.update(enabledStateKey, true);
+          await this.workspaceState.update(enabledStateKey, wasEnabled);
         } catch (error) {
-          this.output.appendLine(`Unable to restore the tab-label opt-in: ${String(error)}`);
+          this.output.appendLine(`Unable to restore the tab-label opt-in state: ${String(error)}`);
         }
         void vscode.window.showWarningMessage(
           "GritPad could not clean up editor tab titles. See the GritPad output for details.",
