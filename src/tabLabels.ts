@@ -178,6 +178,7 @@ export class TabLabelManager {
     for (let attempt = 1; attempt <= maxSyncAttempts; attempt += 1) {
       const plan = this.planSync(removeAllOwned, previousOwned);
       if (!plan) {
+        await this.restoreOwnership(previousOwned);
         return false;
       }
 
@@ -188,6 +189,7 @@ export class TabLabelManager {
         void vscode.window.showWarningMessage(
           "GritPad could not save ownership for its tab-label rules. See the GritPad output for details.",
         );
+        await this.restoreOwnership(previousOwned);
         return false;
       }
 
