@@ -249,7 +249,7 @@ suite("GritPad Extension Host", () => {
 
     const state = new BlockingOwnedRulesMemento();
     await state.update("gritPad.tabLabelsEnabled", true);
-    await state.update("gritPad.ownedTabRules", { [articlePattern]: "Owned label" });
+    await TestMemento.prototype.update.call(state, "gritPad.ownedTabRules", { [articlePattern]: "Owned label" });
     const manager = new TabLabelManager(state, index, output);
     try {
       const disabling = manager.disable();
