@@ -60,7 +60,7 @@ export class TabLabelManager {
       return false;
     }
 
-    await this.index.refresh();
+    await this.index.refresh(true);
     const succeeded = await this.sync();
     if (!succeeded) {
       void vscode.window.showWarningMessage(
