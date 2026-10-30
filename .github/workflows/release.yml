@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - name: Check out selected main commit
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Read and validate project version
+        id: project
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const semver = require('semver');
+          const { name, version } = require('./package.json');
+          if (!semver.valid(version) || !/^[a-z0-9][a-z0-9-]*$/.test(name)) {
+            throw new Error('package.json must contain a valid SemVer version and a safe package name.');
+          }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, [
+            `tag=v${version}`,
+            `asset=${name}-${version}.vsix`,
+            `prerelease=${semver.prerelease(version) !== null}`,
+            '',
+          ].join('\n'));
+          NODE
+
+      - name: Run unit and Extension Host tests
+        run: xvfb-run -a npm test
+
+      - name: Build VSIX
+        run: npm run package
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.project.outputs.tag }}
+          RELEASE_ASSET: ${{ steps.project.outputs.asset }}
+          PRERELEASE: ${{ steps.project.outputs.prerelease }}
+        shell: bash
+        run: |
+          test -f "$RELEASE_ASSET"
+          args=("$RELEASE_TAG" "$RELEASE_ASSET" --target "$GITHUB_SHA" --title "GritPad $RELEASE_TAG" --generate-notes)
+          if [ "$PRERELEASE" = true ]; then
+            args+=(--prerelease)
+          fi
+          gh release create "${args[@]}"

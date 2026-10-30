@@ -10,3 +10,5 @@ src/**
 tsconfig.json
 **/*.map
 !dist/**
+
+.github/**

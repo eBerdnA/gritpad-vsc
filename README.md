@@ -80,3 +80,9 @@ VSCODE_EXECUTABLE="/Applications/Visual Studio Code.app/Contents/MacOS/Code" npm
 The extension is now displayed as **GritPad**, with an Explorer view named **Gritpad** and Command Palette entries prefixed **Gritpad:**. The installed extension ID (`local.markdown-frontmatter-titles`) remains unchanged so this is an in-place update rather than a second extension.
 
 Rename the old `frontmatterTitles.modifiedOnSave.enabled` and `frontmatterTitles.modifiedOnSave.include` settings to `gritPad.modifiedOnSave.enabled` and `gritPad.modifiedOnSave.include` respectively. The old settings are no longer read; the extension does not edit your settings automatically. Existing tab-title opt-in and owned-rule records are migrated to the new internal keys so refresh and cleanup continue to work.
+
+## GitHub releases
+
+Update `version` in `package.json` and the lockfile, then merge the change to `main`. In **Actions > Release > Run workflow**, select **main** to publish a release. The workflow is manual-only; runs dispatched against any other branch or a tag skip the release job.
+
+The workflow runs unit and Extension Host tests, builds the VSIX, and creates a GitHub release tagged `v<package.json version>` at the selected main commit, with generated release notes and the VSIX attached. SemVer prerelease versions are marked as prereleases. Publishing an already released version fails rather than replacing its release/assets; bump the version for the next release. This workflow does not publish to the VS Code Marketplace.
