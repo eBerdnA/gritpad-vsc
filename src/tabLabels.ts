@@ -1,0 +1,230 @@
+import * as vscode from "vscode";
+import { MarkdownTitleEntry, TitleIndex } from "./titleIndex";
+import { createTabLabelRules } from "./tabLabelRules";
+
+const enabledStateKey = "frontmatterTitles.tabLabelsEnabled";
+const ownedRulesStateKey = "frontmatterTitles.ownedTabRules";
+
+type OwnedRules = Record<string, string>;
+
+export class TabLabelManager {
+  private syncQueue: Promise<void> = Promise.resolve();
+
+  constructor(
+    private readonly workspaceState: vscode.Memento,
+    private readonly index: TitleIndex,
+    private readonly output: vscode.OutputChannel,
+  ) {}
+
+  get enabled(): boolean {
+    return this.workspaceState.get<boolean>(enabledStateKey, false);
+  }
+
+  async enable(): Promise<boolean> {
+    if (!vscode.workspace.isTrusted) {
+      void vscode.window.showWarningMessage(
+        "Markdown Titles will not change workspace settings in an untrusted workspace.",
+      );
+      return false;
+    }
+    if (!vscode.workspace.workspaceFolders?.length) {
+      void vscode.window.showWarningMessage(
+        "Open a workspace folder before enabling editor tab titles.",
+      );
+      return false;
+    }
+
+    const choice = await vscode.window.showWarningMessage(
+      "Enable Markdown tab titles? This writes exact-file rules to this workspace's settings (a .vscode/settings.json file or a .code-workspace file). The settings may be tracked by version control. The extension will preserve unrelated rules and only remove rules it still owns.",
+      { modal: true },
+      "Enable",
+    );
+    if (choice !== "Enable") {
+      return false;
+    }
+
+    await this.index.refresh();
+    const succeeded = await this.sync();
+    if (!succeeded) {
+      return false;
+    }
+    await this.workspaceState.update(enabledStateKey, true);
+    void vscode.window.showInformationMessage(
+      "Markdown editor tab titles are enabled for this workspace.",
+    );
+    return true;
+  }
+
+  async refresh(): Promise<boolean> {
+    if (!this.enabled) {
+      void vscode.window.showWarningMessage(
+        "Enable editor tab titles before refreshing their workspace rules.",
+      );
+      return false;
+    }
+    if (!vscode.workspace.isTrusted) {
+      void vscode.window.showWarningMessage(
+        "Markdown Titles cannot update tab rules in an untrusted workspace.",
+      );
+      return false;
+    }
+    await this.index.refresh(true);
+    return this.sync();
+  }
+
+  async disable(): Promise<boolean> {
+    if (!vscode.workspace.isTrusted) {
+      void vscode.window.showWarningMessage(
+        "Markdown Titles cannot clean up workspace settings in an untrusted workspace.",
+      );
+      return false;
+    }
+
+    const succeeded = await this.sync(true);
+    if (!succeeded) {
+      return false;
+    }
+    await this.workspaceState.update(enabledStateKey, false);
+    void vscode.window.showInformationMessage(
+      "Markdown editor tab titles are disabled for this workspace.",
+    );
+    return true;
+  }
+
+  async sync(removeAllOwned = false): Promise<boolean> {
+    const task = this.syncQueue.then(() => this.syncOnce(removeAllOwned)).catch((error: unknown) => {
+      this.output.appendLine(`Unable to synchronize workspace tab-label settings: ${String(error)}`);
+      return false;
+    });
+    this.syncQueue = task.then(() => undefined);
+    return task;
+  }
+
+  private async syncOnce(removeAllOwned: boolean): Promise<boolean> {
+    if (!vscode.workspace.isTrusted) {
+      this.output.appendLine("Skipped tab-label settings update: workspace is untrusted.");
+      return false;
+    }
+
+    const configuration = vscode.workspace.getConfiguration("workbench.editor.customLabels");
+    if (!configuration.get<boolean>("enabled", true)) {
+      this.output.appendLine(
+        "Tab labels were not updated because workbench.editor.customLabels.enabled is false.",
+      );
+      return false;
+    }
+
+    const patterns = configuration.get<unknown>("patterns", {});
+    const workspacePatternsValue = configuration.inspect<unknown>("patterns")?.workspaceValue;
+    if (
+      !patterns ||
+      typeof patterns !== "object" ||
+      Array.isArray(patterns) ||
+      (workspacePatternsValue !== undefined &&
+        (!workspacePatternsValue ||
+          typeof workspacePatternsValue !== "object" ||
+          Array.isArray(workspacePatternsValue)))
+    ) {
+      this.output.appendLine(
+        "Tab labels were not updated because workbench.editor.customLabels.patterns is not an object.",
+      );
+      return false;
+    }
+
+    const effectivePatterns = patterns as Record<string, unknown>;
+    const currentWorkspacePatterns = (workspacePatternsValue ?? {}) as Record<string, unknown>;
+    const owned = { ...this.workspaceState.get<OwnedRules>(ownedRulesStateKey, {}) };
+    const candidates = this.index.getEntries().flatMap((entry) => {
+      const workspaceFolder = vscode.workspace.getWorkspaceFolder(entry.uri);
+      return entry.frontmatterTitle
+        ? [{
+            path: entry.uri.fsPath,
+            uriPath: entry.uri.path,
+            workspaceFolderPath: workspaceFolder?.uri.path,
+            title: entry.frontmatterTitle,
+          }]
+        : [];
+    });
+    const ruleSet = removeAllOwned ? undefined : createTabLabelRules(candidates);
+    const desired = ruleSet?.rules ?? new Map<string, string>();
+
+    if (!removeAllOwned) {
+      for (const skipped of ruleSet?.skipped ?? []) {
+        this.output.appendLine(
+          `Normal tab label retained for ${skipped.path}: ${skipped.reason}`,
+        );
+      }
+    }
+
+    const nextPatterns: Record<string, unknown> = { ...currentWorkspacePatterns };
+    for (const [pattern, ownedValue] of Object.entries(owned)) {
+      if (desired.has(pattern)) {
+        continue;
+      }
+      if (currentWorkspacePatterns[pattern] === ownedValue) {
+        delete nextPatterns[pattern];
+      } else {
+        this.output.appendLine(
+          `Preserved user-edited tab-label rule "${pattern}" while cleaning up.`,
+        );
+      }
+      delete owned[pattern];
+    }
+
+    for (const [pattern, title] of desired) {
+      const currentWorkspaceValue = currentWorkspacePatterns[pattern];
+      if (Object.hasOwn(owned, pattern)) {
+        if (currentWorkspaceValue !== owned[pattern]) {
+          this.output.appendLine(
+            `Preserved user-edited tab-label rule "${pattern}" instead of replacing it.`,
+          );
+          delete owned[pattern];
+          continue;
+        }
+        if (currentWorkspaceValue !== title) {
+          nextPatterns[pattern] = title;
+          owned[pattern] = title;
+        }
+      } else if (effectivePatterns[pattern] === undefined) {
+        nextPatterns[pattern] = title;
+        owned[pattern] = title;
+      } else if (effectivePatterns[pattern] !== title) {
+        this.output.appendLine(
+          `Preserved conflicting tab-label rule "${pattern}".`,
+        );
+      }
+    }
+
+    const patternsChanged = !sameRecord(currentWorkspacePatterns, nextPatterns);
+    if (patternsChanged) {
+      try {
+        await configuration.update(
+          "patterns",
+          Object.keys(nextPatterns).length > 0 ? nextPatterns : undefined,
+          vscode.ConfigurationTarget.Workspace,
+        );
+      } catch (error) {
+        this.output.appendLine(`Unable to update workspace tab-label settings: ${String(error)}`);
+        void vscode.window.showWarningMessage(
+          "Markdown Titles could not update workspace tab-label settings. See the Markdown Titles output for details.",
+        );
+        return false;
+      }
+    }
+
+    await this.workspaceState.update(ownedRulesStateKey, owned);
+    return true;
+  }
+}
+
+function sameRecord(
+  left: Record<string, unknown>,
+  right: Record<string, unknown>,
+): boolean {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every((key) => Object.hasOwn(right, key) && left[key] === right[key])
+  );
+}

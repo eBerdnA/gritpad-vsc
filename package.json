@@ -76,16 +76,22 @@
   "scripts": {
     "compile": "tsc -p .",
     "watch": "tsc -watch -p .",
-    "test": "npm run compile && node --test out/test/*.test.js",
+    "test:unit": "npm run compile && node --test out/test/*.test.js",
+    "test:integration": "npm run compile && node out/test/runTest.js",
+    "test": "npm run test:unit && npm run test:integration",
+    "vscode:prepublish": "npm run compile",
     "package": "vsce package"
   },
   "dependencies": {
     "yaml": "^2.8.1"
   },
   "devDependencies": {
-    "@vscode/vsce": "^3.6.2",
+    "@types/mocha": "^10.0.10",
     "@types/node": "^22.15.30",
     "@types/vscode": "^1.90.0",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^3.6.2",
+    "mocha": "^12.0.3",
     "typescript": "^5.8.3"
   }
 }

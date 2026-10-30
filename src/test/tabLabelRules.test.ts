@@ -1,0 +1,120 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { createTabLabelRules } from "../tabLabelRules";
+
+test("creates exact relative patterns that include the workspace folder name", () => {
+  const result = createTabLabelRules([
+    {
+      path: "/projects/demo/docs/overview.md",
+      uriPath: "/projects/demo/docs/overview.md",
+      workspaceFolderPath: "/projects/demo",
+      title: "Project overview",
+    },
+  ]);
+  assert.deepEqual([...result.rules], [["demo/docs/overview.md", "Project overview"]]);
+  assert.deepEqual(result.skipped, []);
+});
+
+test("uses slash-normalized URI paths for Windows workspaces", () => {
+  const result = createTabLabelRules([
+    {
+      path: "C:\\Projects\\demo\\docs\\overview.md",
+      uriPath: "/C:/Projects/demo/docs/overview.md",
+      workspaceFolderPath: "/C:/Projects/demo",
+      title: "Project overview",
+    },
+  ]);
+  assert.deepEqual([...result.rules], [["demo/docs/overview.md", "Project overview"]]);
+});
+
+test("keeps Unicode titles when VS Code can represent them", () => {
+  const result = createTabLabelRules([
+    {
+      path: "/work/naïve/über.md",
+      uriPath: "/work/naïve/über.md",
+      workspaceFolderPath: "/work",
+      title: "Résumé 📚",
+    },
+  ]);
+  assert.deepEqual([...result.rules], [["work/naïve/über.md", "Résumé 📚"]]);
+  assert.deepEqual(result.skipped, []);
+});
+
+test("retains normal labels when a title is Unicode-only or template syntax", () => {
+  const result = createTabLabelRules([
+    {
+      path: "/work/emoji.md",
+      uriPath: "/work/emoji.md",
+      workspaceFolderPath: "/work",
+      title: "📚",
+    },
+    {
+      path: "/work/template.md",
+      uriPath: "/work/template.md",
+      workspaceFolderPath: "/work",
+      title: "${filename}",
+    },
+  ]);
+  assert.equal(result.rules.size, 0);
+  assert.match(result.skipped[0].reason, /ASCII letter or digit/);
+  assert.match(result.skipped[1].reason, /template/);
+});
+
+test("does not create rules for Markdown files without a frontmatter title", () => {
+  const result = createTabLabelRules([
+    {
+      path: "/work/readme.md",
+      uriPath: "/work/readme.md",
+      workspaceFolderPath: "/work",
+    },
+  ]);
+  assert.equal(result.rules.size, 0);
+});
+
+test("rejects glob metacharacters in file paths", () => {
+  const result = createTabLabelRules([
+    {
+      path: "/work/docs/post[1].md",
+      uriPath: "/work/docs/post[1].md",
+      workspaceFolderPath: "/work",
+      title: "Post one",
+    },
+  ]);
+  assert.equal(result.rules.size, 0);
+  assert.match(result.skipped[0].reason, /safe exact/);
+});
+
+test("skips conflicting paths across roots but keeps identical-title rules", () => {
+  const conflict = createTabLabelRules([
+    {
+      path: "/projects/one/docs/page.md",
+      uriPath: "/projects/one/docs/page.md",
+      workspaceFolderPath: "/projects/one",
+      title: "First",
+    },
+    {
+      path: "/archive/one/docs/page.md",
+      uriPath: "/archive/one/docs/page.md",
+      workspaceFolderPath: "/archive/one",
+      title: "Second",
+    },
+  ]);
+  assert.equal(conflict.rules.size, 0);
+  assert.equal(conflict.skipped.length, 2);
+
+  const identical = createTabLabelRules([
+    {
+      path: "/projects/one/docs/page.md",
+      uriPath: "/projects/one/docs/page.md",
+      workspaceFolderPath: "/projects/one",
+      title: "Page",
+    },
+    {
+      path: "/archive/one/docs/page.md",
+      uriPath: "/archive/one/docs/page.md",
+      workspaceFolderPath: "/archive/one",
+      title: "Page",
+    },
+  ]);
+  assert.deepEqual([...identical.rules], [["one/docs/page.md", "Page"]]);
+});
