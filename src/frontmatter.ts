@@ -6,7 +6,7 @@ export interface FrontmatterTitle {
 }
 
 const openingDelimiter = /^\uFEFF?---[ \t]*\r?\n/;
-const closingDelimiter = /\r?\n---[ \t]*(?:\r?\n|$)/;
+const closingDelimiter = /(?:^|\r?\n)---[ \t]*(?:\r?\n|$)/;
 
 export function getFrontmatterBlock(contents: string): { yaml: string; offset: number } | { error: string } | undefined {
   const opening = openingDelimiter.exec(contents);
