@@ -81,6 +81,10 @@ The extension is now displayed as **GritPad**, with an Explorer view named **Gri
 
 Rename the old `frontmatterTitles.modifiedOnSave.enabled` and `frontmatterTitles.modifiedOnSave.include` settings to `gritPad.modifiedOnSave.enabled` and `gritPad.modifiedOnSave.include` respectively. The old settings are no longer read; the extension does not edit your settings automatically. Existing tab-title opt-in and owned-rule records are migrated to the new internal keys so refresh and cleanup continue to work.
 
+## Pull request checks
+
+The **Tests** GitHub Actions workflow runs automatically when a pull request is opened, reopened, or updated. It installs locked dependencies, runs the unit and VS Code Extension Host tests on Linux under a virtual display, and verifies VSIX packaging. New commits cancel superseded runs for the same PR. The workflow has read-only repository permissions and does not publish releases.
+
 ## GitHub releases
 
 Update `version` in `package.json` and the lockfile, then merge the change to `main`. In **Actions > Release > Run workflow**, select **main** to publish a release. The workflow is manual-only; runs dispatched against any other branch or a tag skip the release job.
