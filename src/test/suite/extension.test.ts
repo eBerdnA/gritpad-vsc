@@ -3,12 +3,12 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { TitleIndex } from "../../titleIndex";
-import { TabLabelManager } from "../../tabLabels";
+import { migrateTabLabelState, TabLabelManager } from "../../tabLabels";
 import { TitleTree } from "../../titleTree";
 import { createNoteFile } from "../../newNoteCommand";
 import { parse } from "yaml";
 
-suite("Markdown Frontmatter Titles Extension Host", () => {
+suite("GritPad Extension Host", () => {
   const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
   assert.ok(workspaceFolder);
   assert.equal(vscode.workspace.isTrusted, true);
@@ -16,7 +16,7 @@ suite("Markdown Frontmatter Titles Extension Host", () => {
   const extension = vscode.extensions.getExtension("local.markdown-frontmatter-titles");
   assert.ok(extension);
 
-  const output = vscode.window.createOutputChannel("Markdown Titles Test");
+  const output = vscode.window.createOutputChannel("GritPad Test");
   const index = new TitleIndex(output);
   const tree = new TitleTree(index);
   const reloadTestTitle = "restores persisted exact-file labels after an Extension Host restart";
@@ -35,6 +35,32 @@ suite("Markdown Frontmatter Titles Extension Host", () => {
     tree.dispose();
     index.dispose();
     output.dispose();
+  });
+
+  test("contributes Gritpad names and the new settings namespace", () => {
+    const manifest = extension.packageJSON;
+    assert.equal(manifest.displayName, "GritPad");
+    assert.deepEqual(manifest.contributes.views.explorer, [{ id: "gritPad", name: "Gritpad" }]);
+    assert.ok(manifest.contributes.commands.every((command: { command: string; title: string }) =>
+      command.command.startsWith("gritPad.") && command.title.startsWith("Gritpad:")));
+    assert.ok(manifest.contributes.configuration.properties["gritPad.modifiedOnSave.enabled"]);
+    assert.ok(manifest.contributes.configuration.properties["gritPad.modifiedOnSave.include"]);
+    assert.equal(manifest.contributes.configuration.properties["frontmatterTitles.modifiedOnSave.enabled"], undefined);
+  });
+
+  test("migrates tab-label ownership without replacing existing new state", async () => {
+    const state = new TestMemento();
+    await state.update("frontmatterTitles.tabLabelsEnabled", true);
+    await state.update("frontmatterTitles.ownedTabRules", { "primary/old.md": "Old title" });
+    await migrateTabLabelState(state);
+    assert.equal(state.get("gritPad.tabLabelsEnabled"), true);
+    assert.deepEqual(state.get("gritPad.ownedTabRules"), { "primary/old.md": "Old title" });
+    assert.equal(state.get("frontmatterTitles.ownedTabRules"), undefined);
+    await state.update("frontmatterTitles.tabLabelsEnabled", true);
+    await state.update("gritPad.tabLabelsEnabled", false);
+    await migrateTabLabelState(state);
+    assert.equal(state.get("gritPad.tabLabelsEnabled"), false);
+    assert.equal(state.get("frontmatterTitles.tabLabelsEnabled"), undefined);
   });
 
   test("indexes only included Markdown files and preserves original URIs", async () => {
@@ -221,7 +247,7 @@ suite("Markdown Frontmatter Titles Extension Host", () => {
   });
 
   test("updates modified on the same save only for opted-in matching notes", async () => {
-    const config = () => vscode.workspace.getConfiguration("frontmatterTitles.modifiedOnSave", workspaceFolder.uri);
+    const config = () => vscode.workspace.getConfiguration("gritPad.modifiedOnSave", workspaceFolder.uri);
     const target = vscode.ConfigurationTarget.WorkspaceFolder;
     const original = "---\nmodified: '2000-01-01 00:00:00 +0000' # comment\ntitle: Saved note\n---\nBody\n";
     const files: vscode.Uri[] = [];
@@ -270,7 +296,7 @@ suite("Markdown Frontmatter Titles Extension Host", () => {
 
   test("creates a UUID-named file with matching frontmatter and normal editor access", async () => {
     const commands = await vscode.commands.getCommands();
-    assert.ok(commands.includes("frontmatterTitles.newNote"));
+    assert.ok(commands.includes("gritPad.newNote"));
     const uri = await createNoteFile(workspaceFolder.uri, "A title: with YAML punctuation");
     try {
       const contents = Buffer.from(await vscode.workspace.fs.readFile(uri)).toString("utf8");

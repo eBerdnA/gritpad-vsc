@@ -54,7 +54,7 @@ export async function newNoteCommand(output: vscode.OutputChannel): Promise<vsco
     return uri;
   } catch (error) {
     output.appendLine(`Unable to create new note: ${String(error)}`);
-    void vscode.window.showErrorMessage(`Markdown Titles could not create the note: ${String(error)}`);
+    void vscode.window.showErrorMessage(`GritPad could not create the note: ${String(error)}`);
     return undefined;
   }
 }

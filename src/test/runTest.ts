@@ -4,7 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 async function main(): Promise<void> {
-  const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), "markdown-titles-test-"));
+  const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), "gritpad-test-"));
   const testWorkingDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "vtt-"));
   const originalWorkingDirectory = process.cwd();
   const workspaceRoot = path.join(fixtureRoot, "primary");

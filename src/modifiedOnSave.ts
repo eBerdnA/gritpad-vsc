@@ -16,7 +16,7 @@ export function registerModifiedOnSave(output: vscode.OutputChannel): vscode.Dis
     if (!folder) {
       return;
     }
-    const configuration = vscode.workspace.getConfiguration("frontmatterTitles.modifiedOnSave", document.uri);
+    const configuration = vscode.workspace.getConfiguration("gritPad.modifiedOnSave", document.uri);
     const enabled = workspaceSetting<unknown>(configuration, "enabled", false);
     const include = workspaceSetting<unknown>(configuration, "include", []);
     if (enabled !== true) {

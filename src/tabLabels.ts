@@ -2,8 +2,25 @@ import * as vscode from "vscode";
 import { TitleIndex } from "./titleIndex";
 import { createTabLabelRules } from "./tabLabelRules";
 
-const enabledStateKey = "frontmatterTitles.tabLabelsEnabled";
-const ownedRulesStateKey = "frontmatterTitles.ownedTabRules";
+const enabledStateKey = "gritPad.tabLabelsEnabled";
+const ownedRulesStateKey = "gritPad.ownedTabRules";
+
+export async function migrateTabLabelState(state: vscode.Memento): Promise<void> {
+  // Retain ownership across the rebrand so cleanup never loses existing rules.
+  for (const [legacy, current] of [
+    ["frontmatterTitles.tabLabelsEnabled", enabledStateKey],
+    ["frontmatterTitles.ownedTabRules", ownedRulesStateKey],
+  ]) {
+    const oldValue = state.get<unknown>(legacy);
+    if (oldValue === undefined) {
+      continue;
+    }
+    if (state.get<unknown>(current) === undefined) {
+      await state.update(current, oldValue);
+    }
+    await state.update(legacy, undefined);
+  }
+}
 
 type OwnedRules = Record<string, string>;
 
@@ -23,7 +40,7 @@ export class TabLabelManager {
   async enable(): Promise<boolean> {
     if (!vscode.workspace.isTrusted) {
       void vscode.window.showWarningMessage(
-        "Markdown Titles will not change workspace settings in an untrusted workspace.",
+        "GritPad will not change workspace settings in an untrusted workspace.",
       );
       return false;
     }
@@ -47,7 +64,7 @@ export class TabLabelManager {
     const succeeded = await this.sync();
     if (!succeeded) {
       void vscode.window.showWarningMessage(
-        "Markdown Titles could not enable editor tab titles. See the Markdown Titles output for details.",
+        "GritPad could not enable editor tab titles. See the GritPad output for details.",
       );
       return false;
     }
@@ -57,7 +74,7 @@ export class TabLabelManager {
       this.output.appendLine(`Unable to persist the tab-title opt-in: ${String(error)}`);
       await this.sync(true);
       void vscode.window.showWarningMessage(
-        "Markdown Titles could not save the tab-title opt-in and cleaned up its workspace rules.",
+        "GritPad could not save the tab-title opt-in and cleaned up its workspace rules.",
       );
       return false;
     }
@@ -76,7 +93,7 @@ export class TabLabelManager {
     }
     if (!vscode.workspace.isTrusted) {
       void vscode.window.showWarningMessage(
-        "Markdown Titles cannot update tab rules in an untrusted workspace.",
+        "GritPad cannot update tab rules in an untrusted workspace.",
       );
       return false;
     }
@@ -84,7 +101,7 @@ export class TabLabelManager {
     const succeeded = await this.sync();
     if (!succeeded) {
       void vscode.window.showWarningMessage(
-        "Markdown Titles could not refresh editor tab titles. See the Markdown Titles output for details.",
+        "GritPad could not refresh editor tab titles. See the GritPad output for details.",
       );
     }
     return succeeded;
@@ -93,7 +110,7 @@ export class TabLabelManager {
   async disable(): Promise<boolean> {
     if (!vscode.workspace.isTrusted) {
       void vscode.window.showWarningMessage(
-        "Markdown Titles cannot clean up workspace settings in an untrusted workspace.",
+        "GritPad cannot clean up workspace settings in an untrusted workspace.",
       );
       return false;
     }
@@ -101,7 +118,7 @@ export class TabLabelManager {
     const succeeded = await this.sync(true);
     if (!succeeded) {
       void vscode.window.showWarningMessage(
-        "Markdown Titles could not clean up editor tab titles. See the Markdown Titles output for details.",
+        "GritPad could not clean up editor tab titles. See the GritPad output for details.",
       );
       return false;
     }
@@ -110,7 +127,7 @@ export class TabLabelManager {
     } catch (error) {
       this.output.appendLine(`Unable to persist the tab-title opt-out: ${String(error)}`);
       void vscode.window.showWarningMessage(
-        "Markdown Titles removed its workspace rules but could not save the opt-out. Tab titles may be re-added after reload.",
+        "GritPad removed its workspace rules but could not save the opt-out. Tab titles may be re-added after reload.",
       );
       return false;
     }
@@ -251,7 +268,7 @@ export class TabLabelManager {
     } catch (error) {
       this.output.appendLine(`Unable to save owned tab-label rules: ${String(error)}`);
       void vscode.window.showWarningMessage(
-        "Markdown Titles could not save ownership for its tab-label rules. See the Markdown Titles output for details.",
+        "GritPad could not save ownership for its tab-label rules. See the GritPad output for details.",
       );
       return false;
     }

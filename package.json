@@ -1,8 +1,8 @@
 {
   "name": "markdown-frontmatter-titles",
-  "displayName": "Markdown Frontmatter Titles",
+  "displayName": "GritPad",
   "description": "Show YAML frontmatter titles in an Explorer view and optionally in editor tabs.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "local",
   "license": "MIT",
   "engines": {
@@ -13,80 +13,80 @@
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
-    "onView:frontmatterTitles",
+    "onView:gritPad",
     "onLanguage:markdown"
   ],
   "contributes": {
     "commands": [
       {
-        "command": "frontmatterTitles.refresh",
-        "title": "Markdown Titles: Refresh Explorer View"
+        "command": "gritPad.refresh",
+        "title": "Gritpad: Refresh Explorer View"
       },
       {
-        "command": "frontmatterTitles.enableTabLabels",
-        "title": "Markdown Titles: Enable Editor Tab Titles"
+        "command": "gritPad.enableTabLabels",
+        "title": "Gritpad: Enable Editor Tab Titles"
       },
       {
-        "command": "frontmatterTitles.refreshTabLabels",
-        "title": "Markdown Titles: Refresh Editor Tab Titles"
+        "command": "gritPad.refreshTabLabels",
+        "title": "Gritpad: Refresh Editor Tab Titles"
       },
       {
-        "command": "frontmatterTitles.disableTabLabels",
-        "title": "Markdown Titles: Disable Editor Tab Titles"
+        "command": "gritPad.disableTabLabels",
+        "title": "Gritpad: Disable Editor Tab Titles"
       },
       {
-        "command": "frontmatterTitles.newNote",
+        "command": "gritPad.newNote",
         "title": "Gritpad: New Note"
       }
     ],
     "views": {
       "explorer": [
         {
-          "id": "frontmatterTitles",
-          "name": "Markdown Titles"
+          "id": "gritPad",
+          "name": "Gritpad"
         }
       ]
     },
     "viewsWelcome": [
       {
-        "view": "frontmatterTitles",
-        "contents": "Shows Markdown files using their YAML frontmatter `title` when available. [Refresh](command:frontmatterTitles.refresh) · [Enable tab titles](command:frontmatterTitles.enableTabLabels)"
+        "view": "gritPad",
+        "contents": "Shows Markdown files using their YAML frontmatter `title` when available. [Refresh](command:gritPad.refresh) · [Enable tab titles](command:gritPad.enableTabLabels)"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "frontmatterTitles.refresh",
-          "when": "view == frontmatterTitles",
+          "command": "gritPad.refresh",
+          "when": "view == gritPad",
           "group": "navigation"
         },
         {
-          "command": "frontmatterTitles.enableTabLabels",
-          "when": "view == frontmatterTitles",
+          "command": "gritPad.enableTabLabels",
+          "when": "view == gritPad",
           "group": "navigation"
         },
         {
-          "command": "frontmatterTitles.refreshTabLabels",
-          "when": "view == frontmatterTitles",
+          "command": "gritPad.refreshTabLabels",
+          "when": "view == gritPad",
           "group": "navigation"
         },
         {
-          "command": "frontmatterTitles.disableTabLabels",
-          "when": "view == frontmatterTitles",
+          "command": "gritPad.disableTabLabels",
+          "when": "view == gritPad",
           "group": "navigation"
         }
       ]
     },
     "configuration": {
-      "title": "Markdown Titles",
+      "title": "GritPad",
       "properties": {
-        "frontmatterTitles.modifiedOnSave.enabled": {
+        "gritPad.modifiedOnSave.enabled": {
           "type": "boolean",
           "default": false,
           "scope": "resource",
           "markdownDescription": "Update existing YAML `modified` timestamps on save. Only workspace/folder settings are honored; requires an explicit notes glob allowlist and a trusted workspace."
         },
-        "frontmatterTitles.modifiedOnSave.include": {
+        "gritPad.modifiedOnSave.include": {
           "type": "array",
           "items": {
             "type": "string",
