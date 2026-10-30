@@ -1,0 +1,91 @@
+{
+  "name": "markdown-frontmatter-titles",
+  "displayName": "Markdown Frontmatter Titles",
+  "description": "Show YAML frontmatter titles in an Explorer view and optionally in editor tabs.",
+  "version": "0.1.0",
+  "publisher": "local",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onView:frontmatterTitles"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "frontmatterTitles.refresh",
+        "title": "Markdown Titles: Refresh Explorer View"
+      },
+      {
+        "command": "frontmatterTitles.enableTabLabels",
+        "title": "Markdown Titles: Enable Editor Tab Titles"
+      },
+      {
+        "command": "frontmatterTitles.refreshTabLabels",
+        "title": "Markdown Titles: Refresh Editor Tab Titles"
+      },
+      {
+        "command": "frontmatterTitles.disableTabLabels",
+        "title": "Markdown Titles: Disable Editor Tab Titles"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "frontmatterTitles",
+          "name": "Markdown Titles"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "frontmatterTitles",
+        "contents": "Shows Markdown files using their YAML frontmatter `title` when available. [Refresh](command:frontmatterTitles.refresh) · [Enable tab titles](command:frontmatterTitles.enableTabLabels)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "frontmatterTitles.refresh",
+          "when": "view == frontmatterTitles",
+          "group": "navigation"
+        },
+        {
+          "command": "frontmatterTitles.enableTabLabels",
+          "when": "view == frontmatterTitles",
+          "group": "navigation"
+        },
+        {
+          "command": "frontmatterTitles.refreshTabLabels",
+          "when": "view == frontmatterTitles",
+          "group": "navigation"
+        },
+        {
+          "command": "frontmatterTitles.disableTabLabels",
+          "when": "view == frontmatterTitles",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -watch -p .",
+    "test": "npm run compile && node --test out/test/*.test.js",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.6.2",
+    "@types/node": "^22.15.30",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.8.3"
+  }
+}
