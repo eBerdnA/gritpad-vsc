@@ -8,19 +8,28 @@ export interface FrontmatterTitle {
 const openingDelimiter = /^\uFEFF?---[ \t]*\r?\n/;
 const closingDelimiter = /\r?\n---[ \t]*(?:\r?\n|$)/;
 
-export function readFrontmatterTitle(contents: string): FrontmatterTitle {
+export function getFrontmatterBlock(contents: string): { yaml: string; offset: number } | { error: string } | undefined {
   const opening = openingDelimiter.exec(contents);
   if (!opening) {
-    return {};
+    return undefined;
   }
-
   const remainder = contents.slice(opening[0].length);
   const closing = closingDelimiter.exec(remainder);
   if (!closing) {
     return { error: "Frontmatter is missing its closing --- delimiter." };
   }
+  return { yaml: remainder.slice(0, closing.index), offset: opening[0].length };
+}
 
-  const document = parseDocument(remainder.slice(0, closing.index), {
+export function readFrontmatterTitle(contents: string): FrontmatterTitle {
+  const block = getFrontmatterBlock(contents);
+  if (!block) {
+    return {};
+  }
+  if ("error" in block) {
+    return block;
+  }
+  const document = parseDocument(block.yaml, {
     uniqueKeys: true,
     prettyErrors: false,
   });

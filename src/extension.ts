@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { getMarkdownGlob, TitleIndex } from "./titleIndex";
 import { TabLabelManager } from "./tabLabels";
 import { TitleTree } from "./titleTree";
+import { registerModifiedOnSave } from "./modifiedOnSave";
 
 export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel("Markdown Titles");
@@ -13,7 +14,7 @@ export function activate(context: vscode.ExtensionContext): void {
     showCollapseAll: true,
   });
 
-  context.subscriptions.push(output, index, tree, treeView);
+  context.subscriptions.push(output, index, tree, treeView, registerModifiedOnSave(output));
   context.subscriptions.push(
     index.onDidChange(() => {
       if (tabLabels.enabled) {

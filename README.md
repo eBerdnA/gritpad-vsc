@@ -6,7 +6,7 @@ A Visual Studio Code extension that displays YAML frontmatter titles for Markdow
 
 Open **Explorer → Markdown Titles**. The view keeps workspace folders and subfolders, and shows each Markdown file using its non-empty YAML string `title`. Files without a usable title use their original filename. Duplicate titles remain separate and show their relative paths.
 
-Only a leading YAML block is read. The extension supports `.md` files (case-insensitive extension), parses the saved file on disk, and never renames, rewrites, or opens an alias for a document. Invalid YAML and unreadable files fall back to the filename; details are written to **View → Output → Markdown Titles**. VS Code workspace exclusions are respected. Changes are refreshed after saves and file or workspace-folder changes; use **Markdown Titles: Refresh Explorer View** for a manual refresh.
+Only a leading YAML block is read. The extension supports `.md` files (case-insensitive extension), parses the saved file on disk, and never renames or opens an alias for a document; title display does not rewrite files. Invalid YAML and unreadable files fall back to the filename; details are written to **View → Output → Markdown Titles**. VS Code workspace exclusions are respected. Changes are refreshed after saves and file or workspace-folder changes; use **Markdown Titles: Refresh Explorer View** for a manual refresh.
 
 This is a separate Explorer view, not a replacement for VS Code's built-in Files tree. Opening an entry opens its original URI in a normal text editor.
 
@@ -24,6 +24,23 @@ Tab-label rules are written only in trusted workspaces. VS Code's custom-label s
 
 Unicode titles are supported when they include an ASCII letter or digit. The custom-label feature must also remain enabled in VS Code settings.
 
+## Update note modification timestamps on save (opt-in)
+
+In **Workspace** or **Workspace Folder** settings, explicitly enable the feature and select your notes with folder-relative glob patterns:
+
+```json
+{
+  "frontmatterTitles.modifiedOnSave.enabled": true,
+  "frontmatterTitles.modifiedOnSave.include": ["notes/**/*.md"]
+}
+```
+
+Replace `notes/**/*.md` with your actual notes location. Both settings are required: the feature defaults to off, and an empty allowlist matches nothing. User-global values are ignored. In multi-root workspaces, patterns are relative to each file's workspace folder; use folder settings to restrict the feature to one root.
+
+Only dirty `.md` files inside a trusted workspace that match the allowlist and already contain a top-level YAML `modified` string are updated. The existing value is replaced during the original save, including Auto Save, without an extra save. Unchanged files, files outside the allowlist, missing properties, nested properties, and non-Markdown files are untouched. Opening a note or refreshing the view does not change timestamps.
+
+The format is `modified: 2026-10-30 09:48:01 +0100`, using the computer's local wall time and current UTC offset, including daylight-saving changes. Existing single/double quotes, comments, line endings, and other content are preserved. Malformed YAML and unsupported values (including multiline, tagged, or anchored values) are left unchanged with a reason in **Output > Markdown Titles**. Set `enabled` to `false` to stop updates.
+
 ## Install a local build
 
 Build the extension package:
@@ -36,7 +53,7 @@ npm run package
 Install the generated VSIX with VS Code:
 
 ```sh
-code --install-extension markdown-frontmatter-titles-0.1.0.vsix
+code --install-extension markdown-frontmatter-titles-0.2.0.vsix
 ```
 
 ## Development and tests
