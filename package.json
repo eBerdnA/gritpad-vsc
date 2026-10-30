@@ -1,0 +1,123 @@
+{
+  "name": "markdown-frontmatter-titles",
+  "displayName": "GritPad",
+  "description": "Show YAML frontmatter titles in an Explorer view and optionally in editor tabs.",
+  "version": "0.4.0",
+  "publisher": "local",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onView:gritPad",
+    "onLanguage:markdown"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "gritPad.refresh",
+        "title": "Gritpad: Refresh Explorer View"
+      },
+      {
+        "command": "gritPad.enableTabLabels",
+        "title": "Gritpad: Enable Editor Tab Titles"
+      },
+      {
+        "command": "gritPad.refreshTabLabels",
+        "title": "Gritpad: Refresh Editor Tab Titles"
+      },
+      {
+        "command": "gritPad.disableTabLabels",
+        "title": "Gritpad: Disable Editor Tab Titles"
+      },
+      {
+        "command": "gritPad.newNote",
+        "title": "Gritpad: New Note"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "gritPad",
+          "name": "Gritpad"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "gritPad",
+        "contents": "Shows Markdown files using their YAML frontmatter `title` when available. [Refresh](command:gritPad.refresh) · [Enable tab titles](command:gritPad.enableTabLabels)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "gritPad.refresh",
+          "when": "view == gritPad",
+          "group": "navigation"
+        },
+        {
+          "command": "gritPad.enableTabLabels",
+          "when": "view == gritPad",
+          "group": "navigation"
+        },
+        {
+          "command": "gritPad.refreshTabLabels",
+          "when": "view == gritPad",
+          "group": "navigation"
+        },
+        {
+          "command": "gritPad.disableTabLabels",
+          "when": "view == gritPad",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "GritPad",
+      "properties": {
+        "gritPad.modifiedOnSave.enabled": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "markdownDescription": "Update existing YAML `modified` timestamps on save. Only workspace/folder settings are honored; requires an explicit notes glob allowlist and a trusted workspace."
+        },
+        "gritPad.modifiedOnSave.include": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": [],
+          "scope": "resource",
+          "markdownDescription": "Workspace-folder-relative glob patterns identifying notes, for example `notes/**/*.md`. An empty list matches nothing. Only `.md` files already containing a supported top-level `modified` value are updated. Only workspace/folder settings are honored."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p . && esbuild src/extension.ts --bundle --platform=node --target=node18 --external:vscode --outfile=dist/extension.js",
+    "test:unit": "npm run compile && node --test out/test/*.test.js",
+    "test:integration": "npm run compile && node out/test/runTest.js",
+    "test": "npm run test:unit && npm run test:integration",
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.15.30",
+    "@types/vscode": "^1.90.0",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^3.6.2",
+    "esbuild": "^0.28.2",
+    "mocha": "^12.0.3",
+    "typescript": "^5.8.3"
+  }
+}
