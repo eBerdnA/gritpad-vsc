@@ -26,7 +26,7 @@ Unicode titles are supported when they include an ASCII letter or digit. The cus
 
 ## Create a note
 
-Run **Markdown Titles: New Note** from the Command Palette. Enter a title and choose the destination folder; the folder picker defaults to the current workspace note's folder, or the first workspace root. Cancel either prompt to leave files unchanged.
+Run **Gritpad: New Note** from the Command Palette. Enter a title and choose the destination folder; the folder picker defaults to the current workspace note's folder, or the first workspace root. Cancel either prompt to leave files unchanged.
 
 The command creates and saves `<new UUID>.md`, then opens it in a normal editor. Its leading YAML frontmatter contains the matching UUID `id`, your title, and identical `created` and `modified` timestamps in the computer's local time and UTC offset. Titles are safely YAML-escaped when needed. Existing files are never overwritten. Note creation requires a trusted workspace; it does not enable timestamp-on-save or change your notes allowlist.
 
