@@ -29,7 +29,10 @@ const supportedTitleCharacters = /[a-zA-Z0-9]/;
 export function createTabLabelRules(
   entries: TabLabelCandidate[],
 ): TabLabelRuleSet {
-  const candidates = new Map<string, Array<{ entry: TabLabelCandidate; title: string }>>();
+  const candidates = new Map<
+    string,
+    Array<{ entry: TabLabelCandidate; pattern: string; title: string }>
+  >();
   const skipped: SkippedTabLabel[] = [];
 
   for (const entry of entries) {
@@ -55,6 +58,13 @@ export function createTabLabelRules(
       });
       continue;
     }
+    if (/[\u0000-\u001f\u007f]/.test(title)) {
+      skipped.push({
+        path: entry.path,
+        reason: "The title contains control characters that are unsafe for a tab label.",
+      });
+      continue;
+    }
 
     const pattern = path.posix.relative(
       path.posix.dirname(entry.workspaceFolderPath),
@@ -73,24 +83,25 @@ export function createTabLabelRules(
       continue;
     }
 
-    const samePattern = candidates.get(pattern) ?? [];
-    samePattern.push({ entry, title });
-    candidates.set(pattern, samePattern);
+    const collisionKey = pattern.toLowerCase();
+    const samePattern = candidates.get(collisionKey) ?? [];
+    samePattern.push({ entry, pattern, title });
+    candidates.set(collisionKey, samePattern);
   }
 
   const rules = new Map<string, string>();
-  for (const [pattern, samePattern] of candidates) {
+  for (const samePattern of candidates.values()) {
     const titles = new Set(samePattern.map((candidate) => candidate.title));
     if (titles.size > 1) {
       for (const candidate of samePattern) {
         skipped.push({
           path: candidate.entry.path,
-          reason: "Another workspace file has the same exact path pattern but a different title.",
+          reason: "Another workspace file has the same case-insensitive exact pattern but a different title.",
         });
       }
       continue;
     }
-    rules.set(pattern, samePattern[0].title);
+    rules.set(samePattern[0].pattern, samePattern[0].title);
   }
 
   return { rules, skipped };

@@ -77,7 +77,7 @@ async function main(): Promise<void> {
       settings: {
         "workbench.editor.customLabels.patterns": {
           "**/*.md": "Generic label",
-          "primary/docs/conflict.md": "User conflict",
+          "PRIMARY/DOCS/CONFLICT.MD": "User conflict",
         },
       },
     }),

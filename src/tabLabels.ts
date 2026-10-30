@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { MarkdownTitleEntry, TitleIndex } from "./titleIndex";
+import { TitleIndex } from "./titleIndex";
 import { createTabLabelRules } from "./tabLabelRules";
 
 const enabledStateKey = "frontmatterTitles.tabLabelsEnabled";
@@ -46,9 +46,21 @@ export class TabLabelManager {
     await this.index.refresh();
     const succeeded = await this.sync();
     if (!succeeded) {
+      void vscode.window.showWarningMessage(
+        "Markdown Titles could not enable editor tab titles. See the Markdown Titles output for details.",
+      );
       return false;
     }
-    await this.workspaceState.update(enabledStateKey, true);
+    try {
+      await this.workspaceState.update(enabledStateKey, true);
+    } catch (error) {
+      this.output.appendLine(`Unable to persist the tab-title opt-in: ${String(error)}`);
+      await this.sync(true);
+      void vscode.window.showWarningMessage(
+        "Markdown Titles could not save the tab-title opt-in and cleaned up its workspace rules.",
+      );
+      return false;
+    }
     void vscode.window.showInformationMessage(
       "Markdown editor tab titles are enabled for this workspace.",
     );
@@ -69,7 +81,13 @@ export class TabLabelManager {
       return false;
     }
     await this.index.refresh(true);
-    return this.sync();
+    const succeeded = await this.sync();
+    if (!succeeded) {
+      void vscode.window.showWarningMessage(
+        "Markdown Titles could not refresh editor tab titles. See the Markdown Titles output for details.",
+      );
+    }
+    return succeeded;
   }
 
   async disable(): Promise<boolean> {
@@ -82,9 +100,20 @@ export class TabLabelManager {
 
     const succeeded = await this.sync(true);
     if (!succeeded) {
+      void vscode.window.showWarningMessage(
+        "Markdown Titles could not clean up editor tab titles. See the Markdown Titles output for details.",
+      );
       return false;
     }
-    await this.workspaceState.update(enabledStateKey, false);
+    try {
+      await this.workspaceState.update(enabledStateKey, false);
+    } catch (error) {
+      this.output.appendLine(`Unable to persist the tab-title opt-out: ${String(error)}`);
+      void vscode.window.showWarningMessage(
+        "Markdown Titles removed its workspace rules but could not save the opt-out. Tab titles may be re-added after reload.",
+      );
+      return false;
+    }
     void vscode.window.showInformationMessage(
       "Markdown editor tab titles are disabled for this workspace.",
     );
@@ -133,7 +162,8 @@ export class TabLabelManager {
 
     const effectivePatterns = patterns as Record<string, unknown>;
     const currentWorkspacePatterns = (workspacePatternsValue ?? {}) as Record<string, unknown>;
-    const owned = { ...this.workspaceState.get<OwnedRules>(ownedRulesStateKey, {}) };
+    const previousOwned = { ...this.workspaceState.get<OwnedRules>(ownedRulesStateKey, {}) };
+    const owned = { ...previousOwned };
     const candidates = this.index.getEntries().flatMap((entry) => {
       const workspaceFolder = vscode.workspace.getWorkspaceFolder(entry.uri);
       return entry.frontmatterTitle
@@ -147,6 +177,26 @@ export class TabLabelManager {
     });
     const ruleSet = removeAllOwned ? undefined : createTabLabelRules(candidates);
     const desired = ruleSet?.rules ?? new Map<string, string>();
+    for (const [pattern] of desired) {
+      const variant = Object.keys(effectivePatterns).find(
+        (existingPattern) =>
+          existingPattern !== pattern &&
+          existingPattern.toLowerCase() === pattern.toLowerCase(),
+      );
+      if (!variant) {
+        continue;
+      }
+
+      const ownedVariantIsUnchanged =
+        currentWorkspacePatterns[variant] !== undefined &&
+        owned[variant] === currentWorkspacePatterns[variant];
+      if (!ownedVariantIsUnchanged) {
+        this.output.appendLine(
+          `Preserved case-insensitive user tab-label rule "${variant}".`,
+        );
+        desired.delete(pattern);
+      }
+    }
 
     if (!removeAllOwned) {
       for (const skipped of ruleSet?.skipped ?? []) {
@@ -196,6 +246,16 @@ export class TabLabelManager {
     }
 
     const patternsChanged = !sameRecord(currentWorkspacePatterns, nextPatterns);
+    try {
+      await this.workspaceState.update(ownedRulesStateKey, owned);
+    } catch (error) {
+      this.output.appendLine(`Unable to save owned tab-label rules: ${String(error)}`);
+      void vscode.window.showWarningMessage(
+        "Markdown Titles could not save ownership for its tab-label rules. See the Markdown Titles output for details.",
+      );
+      return false;
+    }
+
     if (patternsChanged) {
       try {
         await configuration.update(
@@ -205,14 +265,16 @@ export class TabLabelManager {
         );
       } catch (error) {
         this.output.appendLine(`Unable to update workspace tab-label settings: ${String(error)}`);
-        void vscode.window.showWarningMessage(
-          "Markdown Titles could not update workspace tab-label settings. See the Markdown Titles output for details.",
-        );
+        try {
+          await this.workspaceState.update(ownedRulesStateKey, previousOwned);
+        } catch (restoreError) {
+          this.output.appendLine(
+            `Unable to restore tab-label ownership after settings update failed: ${String(restoreError)}`,
+          );
+        }
         return false;
       }
     }
-
-    await this.workspaceState.update(ownedRulesStateKey, owned);
     return true;
   }
 }

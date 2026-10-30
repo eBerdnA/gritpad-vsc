@@ -17,8 +17,14 @@ suite("Markdown Frontmatter Titles Extension Host", () => {
   const output = vscode.window.createOutputChannel("Markdown Titles Test");
   const index = new TitleIndex(output);
   const tree = new TitleTree(index);
+  const reloadTestTitle = "restores persisted exact-file labels after an Extension Host restart";
+  const reloadCheck = process.env.RELOAD_CHECK === "1";
 
-  setup(async () => {
+  setup(async function () {
+    const isReloadTest = this.currentTest?.title === reloadTestTitle;
+    if (reloadCheck !== isReloadTest) {
+      this.skip();
+    }
     await extension.activate();
     await index.refresh(true);
   });
@@ -29,13 +35,6 @@ suite("Markdown Frontmatter Titles Extension Host", () => {
     output.dispose();
   });
 
-  if (process.env.RELOAD_CHECK === "1") {
-    test("restores persisted exact-file labels after an Extension Host restart", async () => {
-      const articleUri = vscode.Uri.joinPath(workspaceFolder.uri, "docs", "article.md");
-      await vscode.commands.executeCommand("vscode.open", articleUri);
-      await waitForTabLabel("User-edited label");
-    });
-  } else {
   test("indexes only included Markdown files and preserves original URIs", async () => {
     const entries = index.getEntries();
     assert.equal(entries.length, 10);
@@ -151,6 +150,7 @@ suite("Markdown Frontmatter Titles Extension Host", () => {
     const articlePattern = exactPattern(workspaceFolder.uri.path, articleUri.path);
     const conflictUri = vscode.Uri.joinPath(workspaceFolder.uri, "docs", "conflict.md");
     const conflictPattern = exactPattern(workspaceFolder.uri.path, conflictUri.path);
+    const conflictVariant = conflictPattern.toUpperCase();
     const duplicateUri = vscode.Uri.joinPath(workspaceFolder.uri, "docs", "duplicate.md");
     const duplicatePattern = exactPattern(workspaceFolder.uri.path, duplicateUri.path);
     const patterns = vscode.workspace
@@ -162,7 +162,8 @@ suite("Markdown Frontmatter Titles Extension Host", () => {
     assert.ok(workspacePatterns);
     assert.equal(patterns[articlePattern], "Updated Title");
     assert.equal(patterns["**/*.md"], "Generic label");
-    assert.equal(patterns[conflictPattern], "User conflict");
+    assert.equal(patterns[conflictVariant], "User conflict");
+    assert.equal(Object.hasOwn(patterns, conflictPattern), false);
     assert.equal(patterns[duplicatePattern], "Original Title");
     assert.equal(patterns["global-only.md"], "Global label");
     assert.equal(Object.hasOwn(workspacePatterns, "global-only.md"), false);
@@ -196,7 +197,7 @@ suite("Markdown Frontmatter Titles Extension Host", () => {
       .get<Record<string, string>>("patterns", {});
     assert.equal(cleanedPatterns[articlePattern], "User-edited label");
     assert.equal(Object.hasOwn(cleanedPatterns, duplicatePattern), false);
-    assert.equal(cleanedPatterns[conflictPattern], "User conflict");
+    assert.equal(cleanedPatterns[conflictVariant], "User conflict");
     assert.equal(cleanedPatterns["**/*.md"], "Generic label");
     assert.equal(Object.hasOwn(cleanedPatterns, unicodePattern), false);
     const cleanedInspection = vscode.workspace
@@ -216,7 +217,12 @@ suite("Markdown Frontmatter Titles Extension Host", () => {
     const roots = tree.getChildren();
     assert.deepEqual(roots.map((root) => root.label).sort(), [workspaceFolder.name, "Second Root"].sort());
   });
-  }
+
+  test(reloadTestTitle, async () => {
+    const articleUri = vscode.Uri.joinPath(workspaceFolder.uri, "docs", "article.md");
+    await vscode.commands.executeCommand("vscode.open", articleUri);
+    await waitForTabLabel("User-edited label");
+  });
 });
 
 class TestMemento implements vscode.Memento {

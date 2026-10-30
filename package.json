@@ -11,7 +11,7 @@
   "categories": [
     "Other"
   ],
-  "main": "./out/extension.js",
+  "main": "./dist/extension.js",
   "activationEvents": [
     "onView:frontmatterTitles"
   ],
@@ -74,8 +74,7 @@
     }
   },
   "scripts": {
-    "compile": "tsc -p .",
-    "watch": "tsc -watch -p .",
+    "compile": "tsc -p . && esbuild src/extension.ts --bundle --platform=node --target=node18 --external:vscode --outfile=dist/extension.js",
     "test:unit": "npm run compile && node --test out/test/*.test.js",
     "test:integration": "npm run compile && node out/test/runTest.js",
     "test": "npm run test:unit && npm run test:integration",
@@ -91,6 +90,7 @@
     "@types/vscode": "^1.90.0",
     "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^3.6.2",
+    "esbuild": "^0.28.2",
     "mocha": "^12.0.3",
     "typescript": "^5.8.3"
   }

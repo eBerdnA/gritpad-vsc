@@ -60,6 +60,19 @@ test("retains normal labels when a title is Unicode-only or template syntax", ()
   assert.match(result.skipped[1].reason, /template/);
 });
 
+test("retains normal labels for control characters", () => {
+  const result = createTabLabelRules([
+    {
+      path: "/work/newline.md",
+      uriPath: "/work/newline.md",
+      workspaceFolderPath: "/work",
+      title: "Line one\nLine two",
+    },
+  ]);
+  assert.equal(result.rules.size, 0);
+  assert.match(result.skipped[0].reason, /control characters/);
+});
+
 test("does not create rules for Markdown files without a frontmatter title", () => {
   const result = createTabLabelRules([
     {
@@ -117,4 +130,23 @@ test("skips conflicting paths across roots but keeps identical-title rules", () 
     },
   ]);
   assert.deepEqual([...identical.rules], [["one/docs/page.md", "Page"]]);
+});
+
+test("rejects case-insensitive path collisions with different titles", () => {
+  const result = createTabLabelRules([
+    {
+      path: "/work/Docs/page.md",
+      uriPath: "/work/Docs/page.md",
+      workspaceFolderPath: "/work",
+      title: "Uppercase path",
+    },
+    {
+      path: "/work/docs/page.md",
+      uriPath: "/work/docs/page.md",
+      workspaceFolderPath: "/work",
+      title: "Lowercase path",
+    },
+  ]);
+  assert.equal(result.rules.size, 0);
+  assert.equal(result.skipped.length, 2);
 });

@@ -28,7 +28,12 @@ export function readFrontmatterTitle(contents: string): FrontmatterTitle {
     return { error: document.errors.map((error) => error.message).join("; ") };
   }
 
-  const data = document.toJS();
+  let data: unknown;
+  try {
+    data = document.toJS();
+  } catch (error) {
+    return { error: `Unable to interpret YAML frontmatter: ${String(error)}` };
+  }
   if (data === null || typeof data !== "object" || Array.isArray(data)) {
     return {};
   }
