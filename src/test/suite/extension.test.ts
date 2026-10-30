@@ -443,6 +443,36 @@ suite("GritPad Extension Host", () => {
       "Updated Title",
     );
   });
+
+  test("reconciles the production index when files.exclude changes", async () => {
+    const hiddenUri = vscode.Uri.joinPath(workspaceFolder.uri, "excluded", "hidden.md");
+    const hiddenPattern = exactPattern(workspaceFolder.uri.path, hiddenUri.path);
+    const labels = () => vscode.workspace.getConfiguration("workbench.editor.customLabels")
+      .inspect<Record<string, string>>("patterns")?.workspaceValue ?? {};
+    const filesConfig = () => vscode.workspace.getConfiguration("files", workspaceFolder.uri);
+    const originalExclude = filesConfig().inspect<Record<string, boolean>>("exclude")
+      ?.workspaceFolderValue;
+
+    const originalShowWarningMessage = vscode.window.showWarningMessage;
+    const windowWithMock = vscode.window as unknown as {
+      showWarningMessage: typeof vscode.window.showWarningMessage;
+    };
+    windowWithMock.showWarningMessage = async () => "Enable";
+    try {
+      await vscode.commands.executeCommand("gritPad.enableTabLabels");
+    } finally {
+      windowWithMock.showWarningMessage = originalShowWarningMessage;
+    }
+    assert.equal(Object.hasOwn(labels(), hiddenPattern), false);
+
+    try {
+      await filesConfig().update("exclude", {}, vscode.ConfigurationTarget.WorkspaceFolder);
+      await waitFor(() => labels()[hiddenPattern] === "Hidden");
+    } finally {
+      await filesConfig().update("exclude", originalExclude, vscode.ConfigurationTarget.WorkspaceFolder);
+    }
+    await waitFor(() => !Object.hasOwn(labels(), hiddenPattern));
+  });
 });
 
 class TestMemento implements vscode.Memento {
@@ -495,6 +525,13 @@ class BlockingOwnedRulesMemento extends TestMemento {
 
 function exactPattern(workspacePath: string, filePath: string): string {
   return path.posix.relative(path.posix.dirname(workspacePath), filePath);
+}
+
+async function waitFor(condition: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 50 && !condition(); attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.ok(condition());
 }
 
 async function waitForTabLabel(expected: string): Promise<void> {

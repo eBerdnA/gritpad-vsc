@@ -93,6 +93,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.workspace.onDidGrantWorkspaceTrust(() => {
       scheduleRefresh();
     }),
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration("files.exclude")) {
+        scheduleRefresh();
+      }
+    }),
     new vscode.Disposable(() => {
       if (refreshTimer) {
         clearTimeout(refreshTimer);
