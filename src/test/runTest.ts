@@ -97,6 +97,10 @@ async function main(): Promise<void> {
       ],
     };
     await runTests(testOptions);
+    fs.writeFileSync(
+      path.join(workspaceRoot, "docs", "article.md"),
+      "---\ntitle: Reloaded Title\n---\nUpdated body\n",
+    );
     await runTests({
       ...testOptions,
       extensionTestsEnv: { RELOAD_CHECK: "1" },

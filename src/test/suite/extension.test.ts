@@ -357,8 +357,62 @@ suite("GritPad Extension Host", () => {
 
   test(reloadTestTitle, async () => {
     const articleUri = vscode.Uri.joinPath(workspaceFolder.uri, "docs", "article.md");
+    const articlePattern = exactPattern(
+      workspaceFolder.uri.path,
+      articleUri.path,
+    );
+    const configuration = vscode.workspace.getConfiguration("workbench.editor.customLabels");
     await vscode.commands.executeCommand("vscode.open", articleUri);
-    await waitForTabLabel("User-edited label");
+    await waitForTabLabel("Reloaded Title");
+
+    const workspacePatterns = configuration.inspect<Record<string, string>>("patterns")
+      ?.workspaceValue;
+    assert.equal(workspacePatterns?.[articlePattern], "Reloaded Title");
+    await configuration.update(
+      "patterns",
+      { ...workspacePatterns, [articlePattern]: "User-edited label" },
+      vscode.ConfigurationTarget.Workspace,
+    );
+    await vscode.commands.executeCommand("gritPad.disableTabLabels");
+
+    const cleanedPatterns = configuration.inspect<Record<string, string>>("patterns")
+      ?.workspaceValue;
+    const duplicateUri = vscode.Uri.joinPath(workspaceFolder.uri, "docs", "duplicate.md");
+    const duplicatePattern = exactPattern(workspaceFolder.uri.path, duplicateUri.path);
+    assert.equal(cleanedPatterns?.[articlePattern], "User-edited label");
+    assert.equal(Object.hasOwn(cleanedPatterns ?? {}, duplicatePattern), false);
+  });
+
+  test("persists the production tab-label opt-in and ownership for restart", async () => {
+    const articleUri = vscode.Uri.joinPath(workspaceFolder.uri, "docs", "article.md");
+    const articlePattern = exactPattern(workspaceFolder.uri.path, articleUri.path);
+    const configuration = vscode.workspace.getConfiguration("workbench.editor.customLabels");
+    const currentWorkspacePatterns = configuration.inspect<Record<string, string>>("patterns")
+      ?.workspaceValue ?? {};
+    const patterns = { ...currentWorkspacePatterns };
+    delete patterns[articlePattern];
+    await configuration.update(
+      "patterns",
+      patterns,
+      vscode.ConfigurationTarget.Workspace,
+    );
+
+    const originalShowWarningMessage = vscode.window.showWarningMessage;
+    const windowWithMock = vscode.window as unknown as {
+      showWarningMessage: typeof vscode.window.showWarningMessage;
+    };
+    windowWithMock.showWarningMessage = async () => "Enable";
+    try {
+      await vscode.commands.executeCommand("gritPad.enableTabLabels");
+    } finally {
+      windowWithMock.showWarningMessage = originalShowWarningMessage;
+    }
+
+    assert.equal(
+      configuration.inspect<Record<string, string>>("patterns")
+        ?.workspaceValue?.[articlePattern],
+      "Updated Title",
+    );
   });
 });
 
