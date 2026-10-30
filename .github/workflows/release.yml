@@ -67,6 +67,13 @@ jobs:
         shell: bash
         run: |
           test -f "$RELEASE_ASSET"
+          existing_refs="$(gh api "repos/$GH_REPO/git/matching-refs/tags/$RELEASE_TAG" --jq '.[].ref')"
+          while IFS= read -r ref; do
+            if [[ "$ref" == "refs/tags/$RELEASE_TAG" ]]; then
+              echo "Tag $RELEASE_TAG already exists; bump the package version before releasing." >&2
+              exit 1
+            fi
+          done <<< "$existing_refs"
           args=("$RELEASE_TAG" "$RELEASE_ASSET" --target "$GITHUB_SHA" --title "GritPad $RELEASE_TAG" --generate-notes)
           if [ "$PRERELEASE" = true ]; then
             args+=(--prerelease)
